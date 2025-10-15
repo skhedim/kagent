@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -241,6 +242,141 @@ type MCPServerDeployment struct {
 	// ServiceAccount defines the configuration for the ServiceAccount.
 	// +optional
 	ServiceAccount *ServiceAccountConfig `json:"serviceAccount,omitempty"`
+
+	// PodTemplate allows overriding pod-level configurations.
+	// This includes nodeSelector, tolerations, affinity, securityContext, and other pod-level settings.
+	// +optional
+	PodTemplate *PodTemplateOverrides `json:"podTemplate,omitempty"`
+
+	// ContainerTemplate allows overriding container-level configurations.
+	// This includes resources, lifecycle hooks, security context, and probes.
+	// +optional
+	ContainerTemplate *ContainerOverrides `json:"containerTemplate,omitempty"`
+
+	// DeploymentTemplate allows overriding deployment-level configurations.
+	// This includes replicas, update strategy, and other deployment settings.
+	// +optional
+	DeploymentTemplate *DeploymentOverrides `json:"deploymentTemplate,omitempty"`
+}
+
+// PodTemplateOverrides allows overriding pod-level configurations.
+type PodTemplateOverrides struct {
+	// NodeSelector constrains pods to nodes with specific labels.
+	// +optional
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+
+	// Tolerations allow pods to schedule on nodes with matching taints.
+	// +optional
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+
+	// Affinity rules for pod scheduling (node affinity, pod affinity, pod anti-affinity).
+	// +optional
+	Affinity *corev1.Affinity `json:"affinity,omitempty"`
+
+	// SecurityContext for the pod.
+	// Defines privilege and access control settings at the pod level.
+	// +optional
+	SecurityContext *corev1.PodSecurityContext `json:"securityContext,omitempty"`
+
+	// Additional annotations for pod template.
+	// These are merged with any existing annotations.
+	// +optional
+	Annotations map[string]string `json:"annotations,omitempty"`
+
+	// Additional labels for pod template.
+	// These are merged with any existing labels.
+	// +optional
+	Labels map[string]string `json:"labels,omitempty"`
+
+	// HostNetwork enables host networking for the pod.
+	// +optional
+	HostNetwork bool `json:"hostNetwork,omitempty"`
+
+	// DNSPolicy for the pod.
+	// +optional
+	// +kubebuilder:validation:Enum=ClusterFirstWithHostNet;ClusterFirst;Default;None
+	DNSPolicy corev1.DNSPolicy `json:"dnsPolicy,omitempty"`
+
+	// PriorityClassName for pod scheduling priority.
+	// +optional
+	PriorityClassName string `json:"priorityClassName,omitempty"`
+
+	// RuntimeClassName refers to a RuntimeClass object in the node.k8s.io group.
+	// +optional
+	RuntimeClassName *string `json:"runtimeClassName,omitempty"`
+
+	// ServiceAccountName is the name of the ServiceAccount to use to run this pod.
+	// +optional
+	ServiceAccountName string `json:"serviceAccountName,omitempty"`
+}
+
+// ContainerOverrides allows overriding container-level configurations.
+type ContainerOverrides struct {
+	// Resources for the container (CPU, memory limits and requests).
+	// +optional
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+
+	// SecurityContext for the container.
+	// Defines privilege and access control settings at the container level.
+	// +optional
+	SecurityContext *corev1.SecurityContext `json:"securityContext,omitempty"`
+
+	// Lifecycle hooks (postStart and preStop).
+	// +optional
+	Lifecycle *corev1.Lifecycle `json:"lifecycle,omitempty"`
+
+	// ImagePullPolicy for the container.
+	// +optional
+	// +kubebuilder:validation:Enum=Always;Never;IfNotPresent
+	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
+
+	// LivenessProbe for the container.
+	// +optional
+	LivenessProbe *corev1.Probe `json:"livenessProbe,omitempty"`
+
+	// ReadinessProbe for the container.
+	// +optional
+	ReadinessProbe *corev1.Probe `json:"readinessProbe,omitempty"`
+
+	// StartupProbe for the container.
+	// +optional
+	StartupProbe *corev1.Probe `json:"startupProbe,omitempty"`
+
+	// TerminationMessagePath for the container.
+	// +optional
+	TerminationMessagePath string `json:"terminationMessagePath,omitempty"`
+
+	// TerminationMessagePolicy for the container.
+	// +optional
+	// +kubebuilder:validation:Enum=File;FallbackToLogsOnError
+	TerminationMessagePolicy corev1.TerminationMessagePolicy `json:"terminationMessagePolicy,omitempty"`
+}
+
+// DeploymentOverrides allows overriding deployment-level configurations.
+type DeploymentOverrides struct {
+	// Replicas is the number of desired pods.
+	// +optional
+	Replicas *int32 `json:"replicas,omitempty"`
+
+	// Strategy for deployment updates (RollingUpdate or Recreate).
+	// +optional
+	Strategy *appsv1.DeploymentStrategy `json:"strategy,omitempty"`
+
+	// MinReadySeconds before a pod is considered available.
+	// +optional
+	MinReadySeconds int32 `json:"minReadySeconds,omitempty"`
+
+	// RevisionHistoryLimit for deployment rollback.
+	// +optional
+	RevisionHistoryLimit *int32 `json:"revisionHistoryLimit,omitempty"`
+
+	// ProgressDeadlineSeconds for deployment progress.
+	// +optional
+	ProgressDeadlineSeconds *int32 `json:"progressDeadlineSeconds,omitempty"`
+
+	// Paused indicates that the deployment is paused.
+	// +optional
+	Paused bool `json:"paused,omitempty"`
 }
 
 // InitContainerConfig defines the configuration for the init container.

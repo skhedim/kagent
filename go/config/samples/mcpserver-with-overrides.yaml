@@ -1,0 +1,103 @@
+apiVersion: kagent.dev/v1alpha1
+kind: MCPServer
+metadata:
+  name: example-with-overrides
+  namespace: default
+spec:
+  transportType: http
+  deployment:
+    image: ghcr.io/mark3labs/mcp-server-filesystem:latest
+    port: 3000
+    cmd: "npx"
+    args:
+      - "-y"
+      - "@modelcontextprotocol/server-filesystem"
+      - "/tmp"
+    
+    # Pod-level overrides
+    podTemplate:
+      nodeSelector:
+        disktype: ssd
+        kubernetes.io/os: linux
+      tolerations:
+      - key: "dedicated"
+        operator: "Equal"
+        value: "mcp-workloads"
+        effect: "NoSchedule"
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app: example-with-overrides
+              topologyKey: kubernetes.io/hostname
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 2000
+      priorityClassName: system-cluster-critical
+    
+    # Container-level overrides
+    containerTemplate:
+      resources:
+        requests:
+          cpu: "100m"
+          memory: "128Mi"
+        limits:
+          cpu: "500m"
+          memory: "512Mi"
+      lifecycle:
+        postStart:
+          exec:
+            command:
+            - "/bin/sh"
+            - "-c"
+            - "echo 'MCP Server started' > /tmp/started"
+        preStop:
+          exec:
+            command:
+            - "/bin/sh"
+            - "-c"
+            - "sleep 15"
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+          - ALL
+        readOnlyRootFilesystem: false
+      livenessProbe:
+        httpGet:
+          path: /
+          port: 3000
+        initialDelaySeconds: 30
+        periodSeconds: 10
+      readinessProbe:
+        httpGet:
+          path: /
+          port: 3000
+        initialDelaySeconds: 5
+        periodSeconds: 5
+    
+    # Deployment-level overrides
+    deploymentTemplate:
+      replicas: 2
+      strategy:
+        type: RollingUpdate
+        rollingUpdate:
+          maxSurge: 1
+          maxUnavailable: 0
+      minReadySeconds: 10
+      revisionHistoryLimit: 5
+    
+    # ServiceAccount configuration
+    serviceAccount:
+      annotations:
+        eks.amazonaws.com/role-arn: "arn:aws:iam::123456789012:role/mcp-server-role"
+      labels:
+        environment: production
+        team: platform

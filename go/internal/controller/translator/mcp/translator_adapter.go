@@ -293,6 +293,19 @@ func (t *transportAdapterTranslator) translateTransportAdapterDeployment(
 		return nil, err
 	}
 
+	// Apply overrides before generating config hash
+	if err := t.applyPodTemplateOverrides(deployment, server.Spec.Deployment.PodTemplate); err != nil {
+		return nil, fmt.Errorf("failed to apply pod template overrides: %w", err)
+	}
+
+	if err := t.applyContainerOverrides(deployment, server.Spec.Deployment.ContainerTemplate); err != nil {
+		return nil, fmt.Errorf("failed to apply container overrides: %w", err)
+	}
+
+	if err := t.applyDeploymentOverrides(deployment, server.Spec.Deployment.DeploymentTemplate); err != nil {
+		return nil, fmt.Errorf("failed to apply deployment overrides: %w", err)
+	}
+
 	configYaml, err := t.translateTransportAdapterConfigAsYAML(server)
 	if err != nil {
 		return nil, err
@@ -605,4 +618,201 @@ func (t *transportAdapterTranslator) runPlugins(
 	}
 
 	return objects, errs
+}
+
+// applyPodTemplateOverrides applies pod-level configuration overrides.
+func (t *transportAdapterTranslator) applyPodTemplateOverrides(
+	deployment *appsv1.Deployment,
+	overrides *v1alpha1.PodTemplateOverrides,
+) error {
+	if overrides == nil {
+		return nil
+	}
+
+	podSpec := &deployment.Spec.Template.Spec
+
+	// Apply NodeSelector
+	if overrides.NodeSelector != nil {
+		if podSpec.NodeSelector == nil {
+			podSpec.NodeSelector = make(map[string]string)
+		}
+		for k, v := range overrides.NodeSelector {
+			podSpec.NodeSelector[k] = v
+		}
+	}
+
+	// Apply Tolerations
+	if overrides.Tolerations != nil {
+		podSpec.Tolerations = append(podSpec.Tolerations, overrides.Tolerations...)
+	}
+
+	// Apply Affinity
+	if overrides.Affinity != nil {
+		podSpec.Affinity = overrides.Affinity
+	}
+
+	// Apply SecurityContext
+	if overrides.SecurityContext != nil {
+		podSpec.SecurityContext = overrides.SecurityContext
+	}
+
+	// Apply Annotations
+	if overrides.Annotations != nil {
+		if deployment.Spec.Template.Annotations == nil {
+			deployment.Spec.Template.Annotations = make(map[string]string)
+		}
+		for k, v := range overrides.Annotations {
+			deployment.Spec.Template.Annotations[k] = v
+		}
+	}
+
+	// Apply Labels
+	if overrides.Labels != nil {
+		if deployment.Spec.Template.Labels == nil {
+			deployment.Spec.Template.Labels = make(map[string]string)
+		}
+		for k, v := range overrides.Labels {
+			deployment.Spec.Template.Labels[k] = v
+		}
+	}
+
+	// Apply HostNetwork
+	if overrides.HostNetwork {
+		podSpec.HostNetwork = true
+	}
+
+	// Apply DNSPolicy
+	if overrides.DNSPolicy != "" {
+		podSpec.DNSPolicy = overrides.DNSPolicy
+	}
+
+	// Apply PriorityClassName
+	if overrides.PriorityClassName != "" {
+		podSpec.PriorityClassName = overrides.PriorityClassName
+	}
+
+	// Apply RuntimeClassName
+	if overrides.RuntimeClassName != nil {
+		podSpec.RuntimeClassName = overrides.RuntimeClassName
+	}
+
+	// Apply ServiceAccountName
+	if overrides.ServiceAccountName != "" {
+		podSpec.ServiceAccountName = overrides.ServiceAccountName
+	}
+
+	return nil
+}
+
+// applyContainerOverrides applies container-level configuration overrides.
+func (t *transportAdapterTranslator) applyContainerOverrides(
+	deployment *appsv1.Deployment,
+	overrides *v1alpha1.ContainerOverrides,
+) error {
+	if overrides == nil {
+		return nil
+	}
+
+	// Find the mcp-server container
+	containers := &deployment.Spec.Template.Spec.Containers
+	var container *corev1.Container
+	for i := range *containers {
+		if (*containers)[i].Name == "mcp-server" {
+			container = &(*containers)[i]
+			break
+		}
+	}
+
+	if container == nil {
+		return fmt.Errorf("mcp-server container not found in deployment")
+	}
+
+	// Apply Resources
+	if overrides.Resources != nil {
+		container.Resources = *overrides.Resources
+	}
+
+	// Apply SecurityContext
+	if overrides.SecurityContext != nil {
+		container.SecurityContext = overrides.SecurityContext
+	}
+
+	// Apply Lifecycle hooks
+	if overrides.Lifecycle != nil {
+		container.Lifecycle = overrides.Lifecycle
+	}
+
+	// Apply ImagePullPolicy
+	if overrides.ImagePullPolicy != "" {
+		container.ImagePullPolicy = overrides.ImagePullPolicy
+	}
+
+	// Apply LivenessProbe
+	if overrides.LivenessProbe != nil {
+		container.LivenessProbe = overrides.LivenessProbe
+	}
+
+	// Apply ReadinessProbe
+	if overrides.ReadinessProbe != nil {
+		container.ReadinessProbe = overrides.ReadinessProbe
+	}
+
+	// Apply StartupProbe
+	if overrides.StartupProbe != nil {
+		container.StartupProbe = overrides.StartupProbe
+	}
+
+	// Apply TerminationMessagePath
+	if overrides.TerminationMessagePath != "" {
+		container.TerminationMessagePath = overrides.TerminationMessagePath
+	}
+
+	// Apply TerminationMessagePolicy
+	if overrides.TerminationMessagePolicy != "" {
+		container.TerminationMessagePolicy = overrides.TerminationMessagePolicy
+	}
+
+	return nil
+}
+
+// applyDeploymentOverrides applies deployment-level configuration overrides.
+func (t *transportAdapterTranslator) applyDeploymentOverrides(
+	deployment *appsv1.Deployment,
+	overrides *v1alpha1.DeploymentOverrides,
+) error {
+	if overrides == nil {
+		return nil
+	}
+
+	// Apply Replicas
+	if overrides.Replicas != nil {
+		deployment.Spec.Replicas = overrides.Replicas
+	}
+
+	// Apply Strategy
+	if overrides.Strategy != nil {
+		deployment.Spec.Strategy = *overrides.Strategy
+	}
+
+	// Apply MinReadySeconds
+	if overrides.MinReadySeconds > 0 {
+		deployment.Spec.MinReadySeconds = overrides.MinReadySeconds
+	}
+
+	// Apply RevisionHistoryLimit
+	if overrides.RevisionHistoryLimit != nil {
+		deployment.Spec.RevisionHistoryLimit = overrides.RevisionHistoryLimit
+	}
+
+	// Apply ProgressDeadlineSeconds
+	if overrides.ProgressDeadlineSeconds != nil {
+		deployment.Spec.ProgressDeadlineSeconds = overrides.ProgressDeadlineSeconds
+	}
+
+	// Apply Paused
+	if overrides.Paused {
+		deployment.Spec.Paused = true
+	}
+
+	return nil
 }
