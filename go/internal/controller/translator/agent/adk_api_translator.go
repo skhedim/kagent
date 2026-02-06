@@ -14,6 +14,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/kagent-dev/kagent/go/api/v1alpha2"
 	"github.com/kagent-dev/kagent/go/internal/adk"
@@ -45,6 +46,18 @@ const (
 	MCPServiceProtocolDefault = v1alpha2.RemoteMCPServerProtocolStreamableHttp
 
 	ProxyHostHeader = "x-kagent-host"
+
+	// defaultMCPServerTimeout is the default timeout for MCP server connections.
+	// This applies when no explicit timeout is configured on the RemoteMCPServer
+	// or the originating MCPServer/Service resource.
+	//
+	// MCP servers deployed via the MCPServer CRD use a sidecar gateway that
+	// spawns a new stdio process (e.g. via uvx/npx) for each session. Process
+	// startup typically takes 2-8 seconds depending on package cache state,
+	// which exceeds the default 5-second timeout used by some ADK clients
+	// (e.g. Python ADK StreamableHTTPConnectionParams). A 30-second default
+	// provides sufficient headroom for cold starts while remaining responsive.
+	defaultMCPServerTimeout = 30 * time.Second
 )
 
 // ValidationError indicates a configuration error that requires user action to fix.
@@ -1074,12 +1087,16 @@ func (a *adkApiTranslator) translateStreamableHttpTool(ctx context.Context, serv
 	}
 	if server.Spec.Timeout != nil {
 		params.Timeout = ptr.To(server.Spec.Timeout.Seconds())
+	} else {
+		params.Timeout = ptr.To(defaultMCPServerTimeout.Seconds())
 	}
 	if server.Spec.SseReadTimeout != nil {
 		params.SseReadTimeout = ptr.To(server.Spec.SseReadTimeout.Seconds())
 	}
 	if server.Spec.TerminateOnClose != nil {
 		params.TerminateOnClose = server.Spec.TerminateOnClose
+	} else {
+		params.TerminateOnClose = ptr.To(true)
 	}
 
 	return params, nil
@@ -1108,6 +1125,8 @@ func (a *adkApiTranslator) translateSseHttpTool(ctx context.Context, server *v1a
 	}
 	if server.Spec.Timeout != nil {
 		params.Timeout = ptr.To(server.Spec.Timeout.Seconds())
+	} else {
+		params.Timeout = ptr.To(defaultMCPServerTimeout.Seconds())
 	}
 	if server.Spec.SseReadTimeout != nil {
 		params.SseReadTimeout = ptr.To(server.Spec.SseReadTimeout.Seconds())
